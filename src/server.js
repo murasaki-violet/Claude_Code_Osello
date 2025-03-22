@@ -248,9 +248,7 @@ app.prepare().then(() => {
       methods: ["GET", "POST", "OPTIONS"],
       credentials: true
     },
-    // Vercel環境向け設定
-    path: "/socket.io/",
-    // トランスポートは両方サポート（Vercelではpollingを使用）
+    // Render環境向け設定 (WebSocketサポート)
     transports: ["websocket", "polling"],
     // 接続安定性向上のためのオプション
     pingTimeout: 60000,
