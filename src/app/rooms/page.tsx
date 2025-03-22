@@ -53,11 +53,26 @@ export default function RoomsPage() {
         body: JSON.stringify({ name: roomName, playerName }),
       });
 
-      const data = await res.json();
+      // ステータスコードをチェック
+      if (!res.ok) {
+        throw new Error(`Server returned ${res.status}: ${res.statusText}`);
+      }
+
+      // レスポンスが空でないことを確認
+      const text = await res.text();
+      if (!text) {
+        throw new Error("Empty response from server");
+      }
+
+      // JSONとしてパース
+      const data = JSON.parse(text);
+      
       if (data.playerId) {
         sessionStorage.setItem(`room_${data.id}_playerId`, data.playerId);
+        router.push(`/rooms/${data.id}`);
+      } else {
+        throw new Error("Invalid response: missing playerId");
       }
-      router.push(`/rooms/${data.id}`);
     } catch (error) {
       console.error("Error creating room:", error);
       // エラー時はフラグをリセット
@@ -83,10 +98,25 @@ export default function RoomsPage() {
         body: JSON.stringify({ playerName }),
       });
 
-      const data = await res.json();
+      // ステータスコードをチェック
+      if (!res.ok) {
+        throw new Error(`Server returned ${res.status}: ${res.statusText}`);
+      }
+
+      // レスポンスが空でないことを確認
+      const text = await res.text();
+      if (!text) {
+        throw new Error("Empty response from server");
+      }
+
+      // JSONとしてパース
+      const data = JSON.parse(text);
+      
       if (data.success && data.playerId) {
         sessionStorage.setItem(`room_${roomId}_playerId`, data.playerId);
         router.push(`/rooms/${roomId}`);
+      } else {
+        throw new Error("Invalid response: missing success or playerId");
       }
     } catch (error) {
       console.error("Error joining room:", error);

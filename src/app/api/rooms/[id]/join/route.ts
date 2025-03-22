@@ -12,56 +12,85 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Params }
 ) {
-  const roomId = params.id;
-  const { playerName } = await request.json();
+  try {
+    const roomId = params.id;
+    
+    // リクエストの解析
+    let bodyData;
+    try {
+      bodyData = await request.json();
+    } catch (error) {
+      console.error("Failed to parse request body:", error);
+      return NextResponse.json(
+        { error: "Invalid JSON in request body" },
+        { status: 400 }
+      );
+    }
+    
+    const { playerName } = bodyData;
 
-  if (!playerName) {
+    if (!playerName) {
+      return NextResponse.json(
+        { error: "Player name is required" },
+        { status: 400 }
+      );
+    }
+
+    const room = rooms.get(roomId);
+
+    if (!room) {
+      return NextResponse.json(
+        { error: "Room not found" },
+        { status: 404 }
+      );
+    }
+
+    // 部屋がすでに満員か、待機中でない場合はエラー
+    if (room.players.length >= 2 || room.status !== GameStatus.WAITING) {
+      return NextResponse.json(
+        { error: "Room is full or game is already in progress" },
+        { status: 400 }
+      );
+    }
+
+    const playerId = uuidv4();
+
+    const player: Player = {
+      id: playerId,
+      name: playerName,
+      color: "white", // 2人目のプレイヤーは白（後手）
+      lifeGaugePoints: 0,
+      isLifeGaugeReady: false,
+    };
+
+    // プレイヤーを追加
+    room.players.push(player);
+
+    // 2人揃ったらゲームを開始
+    if (room.players.length === 2) {
+      room.status = GameStatus.PLAYING;
+    }
+
+    // 更新した部屋情報を保存
+    try {
+      rooms.set(roomId, room);
+    } catch (error) {
+      console.error("Failed to update room data:", error);
+      return NextResponse.json(
+        { error: "Failed to join room" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      playerId
+    });
+  } catch (error) {
+    console.error("Unexpected error joining room:", error);
     return NextResponse.json(
-      { error: "Player name is required" },
-      { status: 400 }
+      { error: "Internal server error" },
+      { status: 500 }
     );
   }
-
-  const room = rooms.get(roomId);
-
-  if (!room) {
-    return NextResponse.json(
-      { error: "Room not found" },
-      { status: 404 }
-    );
-  }
-
-  // 部屋がすでに満員か、プレイ中以外の場合はエラー
-  if (room.players.length >= 2 && room.status !== GameStatus.WAITING) {
-    return NextResponse.json(
-      { error: "Room is full or game is already in progress" },
-      { status: 400 }
-    );
-  }
-
-  const playerId = uuidv4();
-
-  const player: Player = {
-    id: playerId,
-    name: playerName,
-    color: "white", // 2人目のプレイヤーは白（後手）
-    lifeGaugePoints: 0,
-    isLifeGaugeReady: false,
-  };
-
-  // プレイヤーを追加
-  room.players.push(player);
-
-  // 2人揃ったらゲームを開始
-  if (room.players.length === 2) {
-    room.status = GameStatus.PLAYING;
-  }
-
-  // 更新した部屋情報を保存
-  rooms.set(roomId, room);
-
-  return NextResponse.json({
-    success: true,
-    playerId
-  });
 }
