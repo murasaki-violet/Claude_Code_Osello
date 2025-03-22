@@ -4,11 +4,8 @@ import { GameStatus, Player } from "@/lib/types";
 import { rooms } from "@/lib/store";
 import { getValidMoves } from "@/lib/game";
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const roomId = params.id;
+export async function POST(request: NextRequest, context: { params: { id: string } }) {
+  const roomId = context.params.id;
   const { playerName } = await request.json();
   
   if (!playerName) {
