@@ -6,27 +6,27 @@ import { getValidMoves } from "@/lib/game";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } } // ← ここを修正
+  context: { params: { id: string } } // ✅ Next.js 15の正しい型
 ) {
-  const roomId = params.id;
+  const roomId = context.params.id;
   const { playerName } = await request.json();
-  
+
   if (!playerName) {
     return NextResponse.json(
       { error: "Player name is required" },
       { status: 400 }
     );
   }
-  
+
   const room = rooms.get(roomId);
-  
+
   if (!room) {
     return NextResponse.json(
       { error: "Room not found" },
       { status: 404 }
     );
   }
-  
+
   // 部屋がすでに満員か、プレイ中以外の場合はエラー
   if (room.players.length >= 2 && room.status !== GameStatus.WAITING) {
     return NextResponse.json(
@@ -34,9 +34,9 @@ export async function POST(
       { status: 400 }
     );
   }
-  
+
   const playerId = uuidv4();
-  
+
   const player: Player = {
     id: playerId,
     name: playerName,
@@ -44,18 +44,18 @@ export async function POST(
     lifeGaugePoints: 0,
     isLifeGaugeReady: false,
   };
-  
+
   // プレイヤーを追加
   room.players.push(player);
-  
+
   // 2人揃ったらゲームを開始
   if (room.players.length === 2) {
     room.status = GameStatus.PLAYING;
   }
-  
+
   // 更新した部屋情報を保存
   rooms.set(roomId, room);
-  
+
   return NextResponse.json({
     success: true,
     playerId
