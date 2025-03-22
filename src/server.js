@@ -245,8 +245,20 @@ app.prepare().then(() => {
   const io = new Server(server, {
     cors: {
       origin: "*",
-      methods: ["GET", "POST"]
-    }
+      methods: ["GET", "POST", "OPTIONS"],
+      credentials: true
+    },
+    // Vercel環境向け設定
+    path: "/socket.io/",
+    // トランスポートは両方サポート（Vercelではpollingを使用）
+    transports: ["websocket", "polling"],
+    // 接続安定性向上のためのオプション
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    upgradeTimeout: 30000,
+    maxHttpBufferSize: 1e8,
+    // クライアントの自動再接続設定
+    allowEIO3: true
   });
 
   // Socket.IOの設定
