@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rooms } from "@/lib/store";
 
+interface Params {
+  id: string;
+}
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Params }
 ) {
   const roomId = params.id;
   const room = rooms.get(roomId);

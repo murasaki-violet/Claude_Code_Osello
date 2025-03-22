@@ -4,11 +4,15 @@ import { GameStatus, Player } from "@/lib/types";
 import { rooms } from "@/lib/store";
 import { getValidMoves } from "@/lib/game";
 
+interface Params {
+  id: string;
+}
+
 export async function POST(
   request: NextRequest,
-  context: { params: { id: string } } // ✅ Next.js 15の正しい型
+  { params }: { params: Params }
 ) {
-  const roomId = context.params.id;
+  const roomId = params.id;
   const { playerName } = await request.json();
 
   if (!playerName) {
