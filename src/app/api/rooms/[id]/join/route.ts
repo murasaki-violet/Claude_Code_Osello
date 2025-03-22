@@ -4,7 +4,11 @@ import { GameStatus, Player } from "@/lib/types";
 import { rooms } from "@/lib/store";
 import { getValidMoves } from "@/lib/game";
 
-export async function POST(request: NextRequest, context: { params: { id: string } }) {
+interface Context {
+  params: { id: string };
+}
+
+export async function POST(request: NextRequest, context: Context) {
   const roomId = context.params.id;
   const { playerName } = await request.json();
   
