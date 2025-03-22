@@ -10,6 +10,8 @@ export default function RoomsPage() {
   const [roomName, setRoomName] = useState("");
   const [playerName, setPlayerName] = useState("");
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [joiningRoomId, setJoiningRoomId] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -34,7 +36,10 @@ export default function RoomsPage() {
 
   const createRoom = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!roomName.trim() || !playerName.trim()) return;
+    if (!roomName.trim() || !playerName.trim() || creating) return;
+
+    // 処理中のフラグを設定
+    setCreating(true);
 
     // プレイヤー名をローカルストレージに保存
     localStorage.setItem("playerName", playerName);
@@ -55,11 +60,16 @@ export default function RoomsPage() {
       router.push(`/rooms/${data.id}`);
     } catch (error) {
       console.error("Error creating room:", error);
+      // エラー時はフラグをリセット
+      setCreating(false);
     }
   };
 
   const joinRoom = async (roomId: string) => {
-    if (!playerName.trim()) return;
+    if (!playerName.trim() || joiningRoomId !== null) return;
+
+    // 処理中のフラグを設定
+    setJoiningRoomId(roomId);
 
     // プレイヤー名をローカルストレージに保存
     localStorage.setItem("playerName", playerName);
@@ -80,6 +90,8 @@ export default function RoomsPage() {
       }
     } catch (error) {
       console.error("Error joining room:", error);
+      // エラー時はフラグをリセット
+      setJoiningRoomId(null);
     }
   };
 
@@ -125,8 +137,9 @@ export default function RoomsPage() {
             <button 
               type="submit"
               className="w-full py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+              disabled={creating}
             >
-              ルームを作成
+              {creating ? "作成中..." : "ルームを作成"}
             </button>
           </form>
         </div>
@@ -153,9 +166,9 @@ export default function RoomsPage() {
                     <button
                       onClick={() => joinRoom(room.id)}
                       className="w-full py-2 px-3 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
-                      disabled={!playerName.trim()}
+                      disabled={!playerName.trim() || joiningRoomId !== null}
                     >
-                      参加する
+                      {joiningRoomId === room.id ? "参加中..." : "参加する"}
                     </button>
                   )}
                   {(room.players.length >= 2 || room.status !== "waiting") && (
