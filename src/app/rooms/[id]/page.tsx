@@ -52,10 +52,18 @@ export default function RoomPage() {
           return;
         }
         
+        // レスポンス形式の互換性対応（デバッグ情報を除く）
+        const roomData = { ...data };
+        
+        // _debug フィールドを削除
+        if (roomData._debug) {
+          delete roomData._debug;
+        }
+        
         // 部屋が見つかった場合は情報を設定
         setGameState(prevState => ({
           ...prevState,
-          room: data
+          room: roomData
         }));
         
         // すでにストアされたプレイヤーIDがある場合

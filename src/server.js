@@ -514,13 +514,31 @@ app.prepare().then(() => {
     // APIエンドポイントを処理する
     if (req.url.startsWith('/api/rooms')) {
       if (req.method === 'GET' && req.url === '/api/rooms') {
-        // ルーム一覧を取得
-        const sortedRooms = [...rooms.values()].sort((a, b) => 
-          b.createdAt.getTime() - a.createdAt.getTime()
-        );
-        
-        res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify(sortedRooms));
+        try {
+          // ルーム一覧を取得
+          const sortedRooms = [...rooms.values()].sort((a, b) => 
+            b.createdAt.getTime() - a.createdAt.getTime()
+          );
+          
+          // デバッグ情報をレスポンスに追加（環境変数に基づいて）
+          const debugInfo = process.env.NODE_ENV === 'production' ? {
+            environment: 'production',
+            serverTime: new Date().toISOString(),
+            roomCount: rooms.size,
+          } : null;
+          
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({
+            rooms: sortedRooms,
+            debug: debugInfo
+          }));
+        } catch (error) {
+          console.error('Error fetching rooms:', error);
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: 'Failed to fetch rooms' }));
+        }
         return;
       }
       
@@ -533,7 +551,18 @@ app.prepare().then(() => {
         
         req.on('end', () => {
           try {
-            const { name, playerName } = JSON.parse(body);
+            let parsedBody;
+            try {
+              parsedBody = JSON.parse(body);
+            } catch (parseError) {
+              console.error('JSON parse error:', parseError);
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: 'Invalid JSON in request body' }));
+              return;
+            }
+            
+            const { name, playerName } = parsedBody;
             
             if (!name || !playerName) {
               res.statusCode = 400;
@@ -542,43 +571,72 @@ app.prepare().then(() => {
               return;
             }
             
-            const { v4: uuidv4 } = require('uuid');
-            const roomId = uuidv4();
-            const playerId = uuidv4();
-            
-            const player = {
-              id: playerId,
-              name: playerName,
-              color: 'black', // 部屋を作成したプレイヤーは黒（先手）
-              lifeGaugePoints: 0,
-              isLifeGaugeReady: false,
-            };
-            
-            const initialBoard = createInitialBoard();
-            
-            const room = {
-              id: roomId,
-              name,
-              players: [player],
-              board: initialBoard,
-              currentTurn: 'black',
-              status: GameStatus.WAITING,
-              isLifeGameActive: false,
-              createdAt: new Date(),
-            };
-            
-            rooms.set(roomId, room);
-            
-            res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify({ 
-              id: roomId,
-              playerId 
-            }));
+            try {
+              const { v4: uuidv4 } = require('uuid');
+              const roomId = uuidv4();
+              const playerId = uuidv4();
+              
+              const player = {
+                id: playerId,
+                name: playerName,
+                color: 'black', // 部屋を作成したプレイヤーは黒（先手）
+                lifeGaugePoints: 0,
+                isLifeGaugeReady: false,
+              };
+              
+              const initialBoard = createInitialBoard();
+              
+              const room = {
+                id: roomId,
+                name,
+                players: [player],
+                board: initialBoard,
+                currentTurn: 'black',
+                status: GameStatus.WAITING,
+                isLifeGameActive: false,
+                createdAt: new Date(),
+              };
+              
+              // 部屋情報を保存
+              try {
+                rooms.set(roomId, room);
+              } catch (storageError) {
+                console.error('Room storage error:', storageError);
+                res.statusCode = 500;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ error: 'Failed to store room data' }));
+                return;
+              }
+              
+              // レスポンスを返す
+              const responseBody = {
+                id: roomId,
+                playerId
+              };
+              
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify(responseBody));
+            } catch (roomCreationError) {
+              console.error('Room creation error:', roomCreationError);
+              res.statusCode = 500;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: 'Failed to create room' }));
+            }
           } catch (error) {
-            res.statusCode = 400;
+            console.error('Unexpected error:', error);
+            res.statusCode = 500;
             res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify({ error: 'Invalid request' }));
+            res.end(JSON.stringify({ error: 'Internal server error' }));
           }
+        });
+        
+        // リクエスト処理中のエラーをキャッチ
+        req.on('error', (error) => {
+          console.error('Request error:', error);
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: 'Request processing error' }));
         });
         
         return;
@@ -587,18 +645,44 @@ app.prepare().then(() => {
       // ルーム情報を取得
       const roomIdMatch = req.url.match(/^\/api\/rooms\/([^\/]+)$/);
       if (req.method === 'GET' && roomIdMatch) {
-        const roomId = roomIdMatch[1];
-        const room = rooms.get(roomId);
-        
-        if (!room) {
-          res.statusCode = 404;
+        try {
+          const roomId = roomIdMatch[1];
+          
+          if (!roomId || typeof roomId !== 'string') {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'Invalid room ID' }));
+            return;
+          }
+          
+          const room = rooms.get(roomId);
+          
+          if (!room) {
+            res.statusCode = 404;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'Room not found' }));
+            return;
+          }
+          
+          // デバッグ情報を追加
+          const debugInfo = process.env.NODE_ENV === 'production' ? {
+            serverTime: new Date().toISOString(),
+            roomExists: Boolean(room),
+            playersCount: room.players.length
+          } : null;
+          
+          res.statusCode = 200;
           res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify({ error: 'Room not found' }));
-          return;
+          res.end(JSON.stringify({
+            ...room,
+            _debug: debugInfo
+          }));
+        } catch (error) {
+          console.error('Error retrieving room:', error);
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: 'Failed to retrieve room data' }));
         }
-        
-        res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify(room));
         return;
       }
       
@@ -615,7 +699,18 @@ app.prepare().then(() => {
         
         req.on('end', () => {
           try {
-            const { playerName } = JSON.parse(body);
+            let parsedBody;
+            try {
+              parsedBody = JSON.parse(body);
+            } catch (parseError) {
+              console.error('JSON parse error:', parseError);
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: 'Invalid JSON in request body' }));
+              return;
+            }
+            
+            const { playerName } = parsedBody;
             
             if (!playerName) {
               res.statusCode = 400;
@@ -624,57 +719,83 @@ app.prepare().then(() => {
               return;
             }
             
-            const room = rooms.get(roomId);
-            
-            if (!room) {
-              res.statusCode = 404;
+            try {
+              const room = rooms.get(roomId);
+              
+              if (!room) {
+                res.statusCode = 404;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ error: 'Room not found' }));
+                return;
+              }
+              
+              // 部屋がすでに満員か、待機中でない場合はエラー
+              if (room.players.length >= 2 || room.status !== GameStatus.WAITING) {
+                res.statusCode = 400;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ 
+                  error: 'Room is full or game is already in progress' 
+                }));
+                return;
+              }
+              
+              const { v4: uuidv4 } = require('uuid');
+              const playerId = uuidv4();
+              
+              const player = {
+                id: playerId,
+                name: playerName,
+                color: 'white', // 2人目のプレイヤーは白（後手）
+                lifeGaugePoints: 0,
+                isLifeGaugeReady: false,
+              };
+              
+              // プレイヤーを追加
+              room.players.push(player);
+              
+              // 2人揃ったらゲームを開始
+              if (room.players.length === 2) {
+                room.status = GameStatus.PLAYING;
+              }
+              
+              // 更新した部屋情報を保存
+              try {
+                rooms.set(roomId, room);
+              } catch (storageError) {
+                console.error('Room update error:', storageError);
+                res.statusCode = 500;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ error: 'Failed to update room data' }));
+                return;
+              }
+              
+              // レスポンスを返す
+              res.statusCode = 200;
               res.setHeader('Content-Type', 'application/json');
-              res.end(JSON.stringify({ error: 'Room not found' }));
-              return;
-            }
-            
-            // 部屋がすでに満員か、プレイ中以外の場合はエラー
-            if (room.players.length >= 2 && room.status !== GameStatus.WAITING) {
-              res.statusCode = 400;
-              res.setHeader('Content-Type', 'application/json');
-              res.end(JSON.stringify({ 
-                error: 'Room is full or game is already in progress' 
+              res.end(JSON.stringify({
+                success: true,
+                playerId
               }));
-              return;
+            } catch (roomJoinError) {
+              console.error('Room join error:', roomJoinError);
+              res.statusCode = 500;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: 'Failed to join room' }));
             }
-            
-            const { v4: uuidv4 } = require('uuid');
-            const playerId = uuidv4();
-            
-            const player = {
-              id: playerId,
-              name: playerName,
-              color: 'white', // 2人目のプレイヤーは白（後手）
-              lifeGaugePoints: 0,
-              isLifeGaugeReady: false,
-            };
-            
-            // プレイヤーを追加
-            room.players.push(player);
-            
-            // 2人揃ったらゲームを開始
-            if (room.players.length === 2) {
-              room.status = GameStatus.PLAYING;
-            }
-            
-            // 更新した部屋情報を保存
-            rooms.set(roomId, room);
-            
-            res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify({
-              success: true,
-              playerId
-            }));
           } catch (error) {
-            res.statusCode = 400;
+            console.error('Unexpected error:', error);
+            res.statusCode = 500;
             res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify({ error: 'Invalid request' }));
+            res.end(JSON.stringify({ error: 'Internal server error' }));
           }
+        });
+        
+        // リクエスト処理中のエラーをキャッチ
+        req.on('error', (error) => {
+          console.error('Request error:', error);
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: 'Request processing error' }));
         });
         
         return;
@@ -682,8 +803,40 @@ app.prepare().then(() => {
     }
   });
 
-  server.listen(3000, (err) => {
-    if (err) throw err;
-    console.log('> Ready on http://localhost:3000');
+  // サーバーのポート設定
+  const port = process.env.PORT || 3000;
+  
+  // エラーハンドリングを追加したサーバー起動
+  server.listen(port, (err) => {
+    if (err) {
+      console.error('Failed to start server:', err);
+      throw err;
+    }
+    console.log(`> Server ready on port ${port}`);
+  });
+  
+  // 予期せぬエラーをキャッチ
+  server.on('error', (err) => {
+    console.error('Server error:', err);
+  });
+  
+  // プロセス終了時のクリーンアップ
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM received, shutting down gracefully');
+    server.close(() => {
+      console.log('Server closed');
+      process.exit(0);
+    });
+  });
+  
+  // 未処理の例外をキャッチ
+  process.on('uncaughtException', (err) => {
+    console.error('Uncaught exception:', err);
+    // サーバーが完全にクラッシュするのを防ぐ
+  });
+  
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    // サーバーが完全にクラッシュするのを防ぐ
   });
 });

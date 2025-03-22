@@ -25,8 +25,23 @@ export default function RoomsPage() {
   const fetchRooms = async () => {
     try {
       const res = await fetch("/api/rooms");
+      
+      // ステータスコードをチェック
+      if (!res.ok) {
+        throw new Error(`Server returned ${res.status}: ${res.statusText}`);
+      }
+      
+      // JSONレスポンスをパース
       const data = await res.json();
-      setRooms(data);
+      
+      // レスポンス形式の互換性チェック
+      const roomsData = Array.isArray(data) ? data : data.rooms;
+      
+      if (!roomsData || !Array.isArray(roomsData)) {
+        throw new Error("Invalid response format: rooms data not found");
+      }
+      
+      setRooms(roomsData);
       setLoading(false);
     } catch (error) {
       console.error("Error fetching rooms:", error);
@@ -61,12 +76,27 @@ export default function RoomsPage() {
       // JSONとしてパース
       const data = await res.json();
       
-      if (data.playerId) {
+      if (data.playerId && data.id) {
+        // プレイヤーIDとルームIDを保存
         sessionStorage.setItem(`room_${data.id}_playerId`, data.playerId);
-        // 直接 window.location を使用してリダイレクトを確実にする
-        window.location.href = `/rooms/${data.id}`;
+        
+        // ルーム情報が取得できるか確認
+        try {
+          const roomCheckRes = await fetch(`/api/rooms/${data.id}`);
+          if (roomCheckRes.ok) {
+            // ルームが正常に作成されたことを確認してからリダイレクト
+            // 直接 window.location を使用してリダイレクトを確実にする
+            window.location.href = `/rooms/${data.id}`;
+          } else {
+            throw new Error(`Room verification failed: ${roomCheckRes.status}`);
+          }
+        } catch (checkError) {
+          console.error("Error verifying room:", checkError);
+          // ルーム確認に失敗してもリダイレクト試行
+          window.location.href = `/rooms/${data.id}`;
+        }
       } else {
-        throw new Error("Invalid response: missing playerId");
+        throw new Error("Invalid response: missing playerId or id");
       }
     } catch (error) {
       console.error("Error creating room:", error);
@@ -102,9 +132,24 @@ export default function RoomsPage() {
       const data = await res.json();
       
       if (data.success && data.playerId) {
+        // プレイヤーIDをセッションストレージに保存
         sessionStorage.setItem(`room_${roomId}_playerId`, data.playerId);
-        // 直接 window.location を使用してリダイレクトを確実にする
-        window.location.href = `/rooms/${roomId}`;
+        
+        // ルーム情報が取得できるか確認
+        try {
+          const roomCheckRes = await fetch(`/api/rooms/${roomId}`);
+          if (roomCheckRes.ok) {
+            // ルームが正常に作成されたことを確認してからリダイレクト
+            // 直接 window.location を使用してリダイレクトを確実にする
+            window.location.href = `/rooms/${roomId}`;
+          } else {
+            throw new Error(`Room verification failed: ${roomCheckRes.status}`);
+          }
+        } catch (checkError) {
+          console.error("Error verifying room:", checkError);
+          // ルーム確認に失敗してもリダイレクト試行
+          window.location.href = `/rooms/${roomId}`;
+        }
       } else {
         throw new Error("Invalid response: missing success or playerId");
       }
