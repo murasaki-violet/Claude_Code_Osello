@@ -40,7 +40,23 @@ export default function RoomPage() {
     
     // 常にルーム情報を最初に取得
     fetch(`/api/rooms/${roomId}`)
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) {
+          throw new Error(`Server returned ${res.status}: ${res.statusText}`);
+        }
+        return res.text();
+      })
+      .then(text => {
+        if (!text) {
+          throw new Error("Empty response from server");
+        }
+        try {
+          return JSON.parse(text);
+        } catch (err) {
+          console.error("Failed to parse JSON response:", err);
+          throw new Error("Invalid response format from server");
+        }
+      })
       .then(data => {
         if (data.error) {
           setErrorMessage(data.error);
@@ -77,13 +93,35 @@ export default function RoomPage() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ playerName })
           })
-            .then(res => res.json())
+            .then(res => {
+              if (!res.ok) {
+                throw new Error(`Server returned ${res.status}: ${res.statusText}`);
+              }
+              return res.text();
+            })
+            .then(text => {
+              if (!text) {
+                throw new Error("Empty response from server");
+              }
+              try {
+                return JSON.parse(text);
+              } catch (err) {
+                console.error("Failed to parse JSON response:", err);
+                throw new Error("Invalid response format from server");
+              }
+            })
             .then(joinData => {
               if (joinData.playerId) {
                 setPlayerId(joinData.playerId);
                 sessionStorage.setItem(`room_${roomId}_playerId`, joinData.playerId);
                 socket.emit("joinRoom", { roomId, playerId: joinData.playerId });
+              } else if (joinData.error) {
+                setErrorMessage(joinData.error);
               }
+            })
+            .catch(err => {
+              console.error("Error joining room:", err);
+              setErrorMessage("ルームに参加できませんでした。");
             });
         } else {
           // 観戦者として接続

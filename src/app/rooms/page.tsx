@@ -69,7 +69,8 @@ export default function RoomsPage() {
       
       if (data.playerId) {
         sessionStorage.setItem(`room_${data.id}_playerId`, data.playerId);
-        router.push(`/rooms/${data.id}`);
+        // 直接 window.location を使用してリダイレクトを確実にする
+        window.location.href = `/rooms/${data.id}`;
       } else {
         throw new Error("Invalid response: missing playerId");
       }
@@ -114,7 +115,8 @@ export default function RoomsPage() {
       
       if (data.success && data.playerId) {
         sessionStorage.setItem(`room_${roomId}_playerId`, data.playerId);
-        router.push(`/rooms/${roomId}`);
+        // 直接 window.location を使用してリダイレクトを確実にする
+        window.location.href = `/rooms/${roomId}`;
       } else {
         throw new Error("Invalid response: missing success or playerId");
       }
@@ -203,7 +205,7 @@ export default function RoomsPage() {
                   )}
                   {(room.players.length >= 2 || room.status !== "waiting") && (
                     <button
-                      onClick={() => router.push(`/rooms/${room.id}`)}
+                      onClick={() => window.location.href = `/rooms/${room.id}`}
                       className="w-full py-2 px-3 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
                     >
                       観戦する
