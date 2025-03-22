@@ -58,14 +58,8 @@ export default function RoomsPage() {
         throw new Error(`Server returned ${res.status}: ${res.statusText}`);
       }
 
-      // レスポンスが空でないことを確認
-      const text = await res.text();
-      if (!text) {
-        throw new Error("Empty response from server");
-      }
-
       // JSONとしてパース
-      const data = JSON.parse(text);
+      const data = await res.json();
       
       if (data.playerId) {
         sessionStorage.setItem(`room_${data.id}_playerId`, data.playerId);
@@ -104,14 +98,8 @@ export default function RoomsPage() {
         throw new Error(`Server returned ${res.status}: ${res.statusText}`);
       }
 
-      // レスポンスが空でないことを確認
-      const text = await res.text();
-      if (!text) {
-        throw new Error("Empty response from server");
-      }
-
       // JSONとしてパース
-      const data = JSON.parse(text);
+      const data = await res.json();
       
       if (data.success && data.playerId) {
         sessionStorage.setItem(`room_${roomId}_playerId`, data.playerId);

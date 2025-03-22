@@ -44,18 +44,7 @@ export default function RoomPage() {
         if (!res.ok) {
           throw new Error(`Server returned ${res.status}: ${res.statusText}`);
         }
-        return res.text();
-      })
-      .then(text => {
-        if (!text) {
-          throw new Error("Empty response from server");
-        }
-        try {
-          return JSON.parse(text);
-        } catch (err) {
-          console.error("Failed to parse JSON response:", err);
-          throw new Error("Invalid response format from server");
-        }
+        return res.json();
       })
       .then(data => {
         if (data.error) {
@@ -97,18 +86,7 @@ export default function RoomPage() {
               if (!res.ok) {
                 throw new Error(`Server returned ${res.status}: ${res.statusText}`);
               }
-              return res.text();
-            })
-            .then(text => {
-              if (!text) {
-                throw new Error("Empty response from server");
-              }
-              try {
-                return JSON.parse(text);
-              } catch (err) {
-                console.error("Failed to parse JSON response:", err);
-                throw new Error("Invalid response format from server");
-              }
+              return res.json();
             })
             .then(joinData => {
               if (joinData.playerId) {
