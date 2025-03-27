@@ -4,7 +4,14 @@ const { parse } = require('url');
 const next = require('next');
 
 const dev = process.env.NODE_ENV !== 'production';
-const app = next({ dev });
+console.log(`Running in ${dev ? 'development' : 'production'} mode`);
+
+// Next.jsアプリの初期化
+const app = next({ 
+  dev,
+  // カスタムサーバーを使用する場合は、ビルトインサーバーを無効化
+  customServer: true 
+});
 const handle = app.getRequestHandler();
 
 // Map型のオブジェクトを作成
@@ -509,30 +516,30 @@ app.prepare().then(() => {
     });
   });
 
-  // APIエンドポイント
-  server.on('request', (req, res) => {
-    // APIエンドポイントを処理する
-    if (req.url.startsWith('/api/rooms')) {
+  // 以前のAPIエンドポイントハンドラを削除
+  // リクエストは新しいハンドラで全て処理
+
+  // サーバーのポート設定
+  const port = process.env.PORT || 3000;
+  
+  // カスタムリクエストハンドラを作成
+  const customRequestHandler = function(req, res) {
+    const parsedUrl = parse(req.url, true);
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    
+    // API関連のリクエストを処理するが、リクエストが他のハンドラによって既に処理されていないか確認
+    if (req.url.startsWith('/api/rooms') && !res.headersSent) {
+      // GETリクエスト - ルーム一覧
       if (req.method === 'GET' && req.url === '/api/rooms') {
         try {
-          // ルーム一覧を取得
+          // 作成日時の新しい順にソート
           const sortedRooms = [...rooms.values()].sort((a, b) => 
             b.createdAt.getTime() - a.createdAt.getTime()
           );
           
-          // デバッグ情報をレスポンスに追加（環境変数に基づいて）
-          const debugInfo = process.env.NODE_ENV === 'production' ? {
-            environment: 'production',
-            serverTime: new Date().toISOString(),
-            roomCount: rooms.size,
-          } : null;
-          
           res.statusCode = 200;
           res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify({
-            rooms: sortedRooms,
-            debug: debugInfo
-          }));
+          res.end(JSON.stringify(sortedRooms));
         } catch (error) {
           console.error('Error fetching rooms:', error);
           res.statusCode = 500;
@@ -542,14 +549,19 @@ app.prepare().then(() => {
         return;
       }
       
+      // POSTリクエスト - 新しいルーム作成
       if (req.method === 'POST' && req.url === '/api/rooms') {
-        // リクエストボディを取得
+        console.log('ルーム作成リクエスト受信');
         let body = '';
         req.on('data', chunk => {
           body += chunk.toString();
         });
         
         req.on('end', () => {
+          if (res.headersSent) {
+            console.log('レスポンスは既に送信済みのため処理をスキップ');
+            return;
+          }
           try {
             let parsedBody;
             try {
@@ -613,6 +625,7 @@ app.prepare().then(() => {
                 id: roomId,
                 playerId
               };
+              console.log('ルーム作成成功:', { roomId, playerId });
               
               res.statusCode = 200;
               res.setHeader('Content-Type', 'application/json');
@@ -631,14 +644,6 @@ app.prepare().then(() => {
           }
         });
         
-        // リクエスト処理中のエラーをキャッチ
-        req.on('error', (error) => {
-          console.error('Request error:', error);
-          res.statusCode = 500;
-          res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify({ error: 'Request processing error' }));
-        });
-        
         return;
       }
       
@@ -647,6 +652,12 @@ app.prepare().then(() => {
       if (req.method === 'GET' && roomIdMatch) {
         try {
           const roomId = roomIdMatch[1];
+          console.log('ルーム情報取得リクエスト:', roomId);
+          
+          if (res.headersSent) {
+            console.log('レスポンスは既に送信済みのため処理をスキップ');
+            return;
+          }
           
           if (!roomId || typeof roomId !== 'string') {
             res.statusCode = 400;
@@ -664,19 +675,9 @@ app.prepare().then(() => {
             return;
           }
           
-          // デバッグ情報を追加
-          const debugInfo = process.env.NODE_ENV === 'production' ? {
-            serverTime: new Date().toISOString(),
-            roomExists: Boolean(room),
-            playersCount: room.players.length
-          } : null;
-          
           res.statusCode = 200;
           res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify({
-            ...room,
-            _debug: debugInfo
-          }));
+          res.end(JSON.stringify(room));
         } catch (error) {
           console.error('Error retrieving room:', error);
           res.statusCode = 500;
@@ -690,6 +691,7 @@ app.prepare().then(() => {
       const joinMatch = req.url.match(/^\/api\/rooms\/([^\/]+)\/join$/);
       if (req.method === 'POST' && joinMatch) {
         const roomId = joinMatch[1];
+        console.log('ルーム参加リクエスト受信:', roomId);
         
         // リクエストボディを取得
         let body = '';
@@ -698,6 +700,10 @@ app.prepare().then(() => {
         });
         
         req.on('end', () => {
+          if (res.headersSent) {
+            console.log('レスポンスは既に送信済みのため処理をスキップ');
+            return;
+          }
           try {
             let parsedBody;
             try {
@@ -770,12 +776,15 @@ app.prepare().then(() => {
               }
               
               // レスポンスを返す
-              res.statusCode = 200;
-              res.setHeader('Content-Type', 'application/json');
-              res.end(JSON.stringify({
+              const responseBody = {
                 success: true,
                 playerId
-              }));
+              };
+              console.log('ルーム参加成功:', { roomId, playerId });
+              
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify(responseBody));
             } catch (roomJoinError) {
               console.error('Room join error:', roomJoinError);
               res.statusCode = 500;
@@ -790,21 +799,16 @@ app.prepare().then(() => {
           }
         });
         
-        // リクエスト処理中のエラーをキャッチ
-        req.on('error', (error) => {
-          console.error('Request error:', error);
-          res.statusCode = 500;
-          res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify({ error: 'Request processing error' }));
-        });
-        
         return;
       }
+    } else {
+      // APIでないリクエストはNext.jsに処理を任せる
+      handle(req, res, parsedUrl);
     }
-  });
-
-  // サーバーのポート設定
-  const port = process.env.PORT || 3000;
+  };
+  
+  // サーバーのリクエストハンドラを設定
+  server.on('request', customRequestHandler);
   
   // エラーハンドリングを追加したサーバー起動
   server.listen(port, (err) => {
@@ -813,6 +817,7 @@ app.prepare().then(() => {
       throw err;
     }
     console.log(`> Server ready on port ${port}`);
+    console.log(`> API endpoints available at /api/rooms`);
   });
   
   // 予期せぬエラーをキャッチ

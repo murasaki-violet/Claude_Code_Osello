@@ -39,16 +39,28 @@ export default function RoomPage() {
     });
     
     // 常にルーム情報を最初に取得
+    console.log(`ルーム情報を取得: roomId=${roomId}`);
     fetch(`/api/rooms/${roomId}`)
       .then(res => {
+        console.log(`ルーム情報取得レスポンス: status=${res.status}`);
         if (!res.ok) {
           throw new Error(`Server returned ${res.status}: ${res.statusText}`);
         }
         return res.json();
       })
       .then(data => {
+        console.log('取得したルーム情報:', data);
         if (data.error) {
           setErrorMessage(data.error);
+          return;
+        }
+        
+        if (data.message === "API is handled by custom server") {
+          console.log('API Router から応答がありました。カスタムサーバーでリトライします');
+          // 少し遅延を入れてカスタムサーバーの初期化待ち
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
           return;
         }
         

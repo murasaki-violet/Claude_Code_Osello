@@ -6,7 +6,7 @@ const nextConfig = {
   },
   // サーバーリクエストのタイムアウト延長
   experimental: {
-    serverComponentsExternalPackages: ['socket.io', 'socket.io-client'],
+    serverExternalPackages: ['socket.io', 'socket.io-client'],
   },
 };
 

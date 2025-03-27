@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { rooms } from "@/lib/store";
 
 interface Params {
   id: string;
@@ -9,15 +8,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Params }
 ) {
-  const roomId = params.id;
-  const room = rooms.get(roomId);
-  
-  if (!room) {
-    return NextResponse.json(
-      { error: "Room not found" },
-      { status: 404 }
-    );
-  }
-  
-  return NextResponse.json(room);
+  // Next.js App Routerを使用する場合は、カスタムサーバーと競合するためAPI機能を無効化
+  // カスタムサーバー(server.js)側でAPIを処理
+  return NextResponse.json({ message: "API is handled by custom server" });
 }

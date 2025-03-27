@@ -2,14 +2,8 @@ import { io } from "socket.io-client";
 
 // WebSocketの接続先URL
 const getSocketUrl = () => {
-  const isProduction = process.env.NODE_ENV === 'production';
-  
-  if (isProduction) {
-    // Renderではlocation.originを使用（サーバーと同じドメインでWebSocketが動作）
-    return typeof window !== "undefined" ? window.location.origin : "";
-  }
-  
-  return "http://localhost:3000"; // 開発環境ではローカルホストを使用
+  // 実行環境に関わらずwindow.location.originを使用して同一オリジンにアクセスする
+  return typeof window !== "undefined" ? window.location.origin : "";
 };
 
 // サーバーサイドでは実行しない
@@ -21,6 +15,7 @@ export const socket = typeof window !== "undefined"
       reconnectionDelay: 1000, // 再接続間隔（ミリ秒）
       timeout: 20000, // タイムアウト時間延長
       forceNew: true, // 新しい接続を強制
+      path: '/socket.io', // パスを明示的に指定
     })
   : null;
 

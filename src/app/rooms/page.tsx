@@ -24,8 +24,10 @@ export default function RoomsPage() {
 
   const fetchRooms = async () => {
     try {
+      console.log("ルーム一覧を取得中...");
       const res = await fetch("/api/rooms");
       
+      console.log(`ルーム一覧取得レスポンス: status=${res.status}`);
       // ステータスコードをチェック
       if (!res.ok) {
         throw new Error(`Server returned ${res.status}: ${res.statusText}`);
@@ -33,6 +35,16 @@ export default function RoomsPage() {
       
       // JSONレスポンスをパース
       const data = await res.json();
+      console.log("取得したルーム一覧データ:", data);
+      
+      if (data.message === "API is handled by custom server") {
+        console.log('API Router から応答がありました。カスタムサーバーでリトライします');
+        // 少し遅延を入れてカスタムサーバーの初期化待ち
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+        return;
+      }
       
       // レスポンス形式の互換性チェック
       const roomsData = Array.isArray(data) ? data : data.rooms;
@@ -41,6 +53,7 @@ export default function RoomsPage() {
         throw new Error("Invalid response format: rooms data not found");
       }
       
+      console.log(`${roomsData.length}個のルームを取得しました`);
       setRooms(roomsData);
       setLoading(false);
     } catch (error) {
@@ -76,26 +89,23 @@ export default function RoomsPage() {
       // JSONとしてパース
       const data = await res.json();
       
+      console.log("ルーム作成レスポンス:", data); // デバッグログを追加
+      
       if (data.playerId && data.id) {
         // プレイヤーIDとルームIDを保存
         sessionStorage.setItem(`room_${data.id}_playerId`, data.playerId);
+        console.log(`プレイヤーID ${data.playerId} をセッションストレージに保存しました`);
         
-        // ルーム情報が取得できるか確認
-        try {
-          const roomCheckRes = await fetch(`/api/rooms/${data.id}`);
-          if (roomCheckRes.ok) {
-            // ルームが正常に作成されたことを確認してからリダイレクト
-            // 直接 window.location を使用してリダイレクトを確実にする
-            window.location.href = `/rooms/${data.id}`;
-          } else {
-            throw new Error(`Room verification failed: ${roomCheckRes.status}`);
-          }
-        } catch (checkError) {
-          console.error("Error verifying room:", checkError);
-          // ルーム確認に失敗してもリダイレクト試行
-          window.location.href = `/rooms/${data.id}`;
-        }
+        // リダイレクト前にちょっと待機して確実にデータが保存されるようにする
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // リダイレクト先のURLをコンソールに出力
+        console.log(`リダイレクト先: /rooms/${data.id}`);
+        
+        // 直接 window.location.replace を使用してリダイレクトを確実にする
+        window.location.replace(`/rooms/${data.id}`);
       } else {
+        console.error("ルーム作成レスポンスにIDがありません:", data);
         throw new Error("Invalid response: missing playerId or id");
       }
     } catch (error) {
@@ -130,26 +140,21 @@ export default function RoomsPage() {
 
       // JSONとしてパース
       const data = await res.json();
+      console.log("ルーム参加レスポンス:", data); // デバッグログを追加
       
       if (data.success && data.playerId) {
         // プレイヤーIDをセッションストレージに保存
         sessionStorage.setItem(`room_${roomId}_playerId`, data.playerId);
+        console.log(`プレイヤーID ${data.playerId} をセッションストレージに保存しました`);
         
-        // ルーム情報が取得できるか確認
-        try {
-          const roomCheckRes = await fetch(`/api/rooms/${roomId}`);
-          if (roomCheckRes.ok) {
-            // ルームが正常に作成されたことを確認してからリダイレクト
-            // 直接 window.location を使用してリダイレクトを確実にする
-            window.location.href = `/rooms/${roomId}`;
-          } else {
-            throw new Error(`Room verification failed: ${roomCheckRes.status}`);
-          }
-        } catch (checkError) {
-          console.error("Error verifying room:", checkError);
-          // ルーム確認に失敗してもリダイレクト試行
-          window.location.href = `/rooms/${roomId}`;
-        }
+        // リダイレクト前にちょっと待機して確実にデータが保存されるようにする
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // リダイレクト先のURLをコンソールに出力
+        console.log(`リダイレクト先: /rooms/${roomId}`);
+        
+        // 直接 window.location.replace を使用してリダイレクトを確実にする
+        window.location.replace(`/rooms/${roomId}`);
       } else {
         throw new Error("Invalid response: missing success or playerId");
       }
